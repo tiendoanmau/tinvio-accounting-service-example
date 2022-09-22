@@ -14,7 +14,7 @@
 
 # Project naming
 
-tinvio-<NOUN>-<PROJECT TYPE>
+tinvio-NOUN-PROJECT_TYPE
 example: tinvio-accounting-service
 
 # Package structure
