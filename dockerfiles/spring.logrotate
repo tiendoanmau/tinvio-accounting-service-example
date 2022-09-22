@@ -1,0 +1,8 @@
+/var/log/spring/* {
+    size 100M
+    rotate 3
+    missingok
+    notifempty
+    dateext
+    daily
+}

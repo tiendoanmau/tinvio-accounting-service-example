@@ -1,0 +1,207 @@
+name: CloudFormation Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment Environment"
+        type: environment
+        required: true
+        options:
+          - dev
+          - staging
+          - production
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REPOSITORY: accounting-service-example/app
+  STAGING_CLOUDFRONT_NAME: staging-accounting-service-example
+  STAGING_CLOUDFRONT_YAML: .aws/staging_cloudformation_template.yaml
+  STAGING_CLOUDFRONT_TASK_COUNT: 1
+  STAGING_CLOUDFRONT_ALB_PRIORITY: 20
+  DEV_CLOUDFRONT_NAME: dev-accounting-service-example
+  DEV_CLOUDFRONT_YAML: .aws/dev_cloudformation_template.yaml
+  DEV_CLOUDFRONT_TASK_COUNT: 1
+  DEV_CLOUDFRONT_ALB_PRIORITY: 35
+  PRODUCTION_CLOUDFRONT_NAME: production-accounting-service-example
+  PRODUCTION_CLOUDFRONT_YAML: .aws/production_cloudformation_template.yaml
+  PRODUCTION_CLOUDFRONT_TASK_COUNT: 1
+  PRODUCTION_CLOUDFRONT_ALB_PRIORITY: 15
+
+jobs:
+  deploy-dev:
+    name: Dev Deployment
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-20.04
+    if: github.event.inputs.environment == 'dev'
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_NON_PROD }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_NON_PROD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: "11"
+          distribution: "temurin"
+          check-latest: true
+          cache: maven
+
+      - name: Build with Maven
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: mvn -B package --file pom.xml
+
+      - name: Configure AWS credentials for Staging
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NON_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NON_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.inputs.environment }}-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG --build-arg APP_VERSION=$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Update CloudFormation Parameters
+        id: deploy-image
+        uses: badsyntax/github-action-aws-cloudformation@master
+        with:
+          stack-name: ${{ env.DEV_CLOUDFRONT_NAME }}
+          template: ${{ env.DEV_CLOUDFRONT_YAML }}
+          aws-region: ${{ env.AWS_REGION }}
+          apply-change-set: true
+          parameters: 'AppVersion=${{ github.event.inputs.environment }}-${{ github.sha }}&TasksCount=${{ env.DEV_CLOUDFRONT_TASK_COUNT }}&ALBPriority=${{ env.DEV_CLOUDFRONT_ALB_PRIORITY }}'
+
+
+  deploy-staging:
+    name: Staging Deployment
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-20.04
+    if: github.event.inputs.environment == 'staging'
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_NON_PROD }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_NON_PROD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: "11"
+          distribution: "temurin"
+          check-latest: true
+          cache: maven
+
+      - name: Build with Maven
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: mvn -B package --file pom.xml
+
+      - name: Configure AWS credentials for Staging
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NON_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NON_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.inputs.environment }}-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG --build-arg APP_VERSION=$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Update CloudFormation Parameters
+        id: deploy-image
+        uses: badsyntax/github-action-aws-cloudformation@master
+        with:
+          stack-name: ${{ env.STAGING_CLOUDFRONT_NAME }}
+          template: ${{ env.STAGING_CLOUDFRONT_YAML }}
+          aws-region: ${{ env.AWS_REGION }}
+          apply-change-set: true
+          parameters: 'AppVersion=${{ github.event.inputs.environment }}-${{ github.sha }}&TasksCount=${{ env.STAGING_CLOUDFRONT_TASK_COUNT }}&ALBPriority=${{ env.STAGING_CLOUDFRONT_ALB_PRIORITY }}'
+
+
+  deploy-production:
+    name: Production Deployment
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-20.04
+    if: github.event.inputs.environment == 'production'
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: "11"
+          distribution: "temurin"
+          check-latest: true
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B package --file pom.xml
+
+      - name: Configure AWS credentials for Staging
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.event.inputs.environment }}-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG --build-arg APP_VERSION=$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Update CloudFormation Parameters
+        id: deploy-image
+        uses: badsyntax/github-action-aws-cloudformation@master
+        with:
+          stack-name: ${{ env.PRODUCTION_CLOUDFRONT_NAME }}
+          template: ${{ env.PRODUCTION_CLOUDFRONT_YAML }}
+          aws-region: ${{ env.AWS_REGION }}
+          apply-change-set: true
+          parameters: 'AppVersion=${{ github.event.inputs.environment }}-${{ github.sha }}&TasksCount=${{ env.PRODUCTION_CLOUDFRONT_TASK_COUNT }}&ALBPriority=${{ env.PRODUCTION_CLOUDFRONT_ALB_PRIORITY }}'
+
