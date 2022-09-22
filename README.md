@@ -1,4 +1,5 @@
 # Project structure
+![alt text](https://github.com/tiendoanmau/tinvio-accounting-service-example/blob/main/src/main/resources/structure.PNG)
 - config: Spring Configuration classes for all of the modules
 - constant: All constant classes
 - controller: REST Endpoints
