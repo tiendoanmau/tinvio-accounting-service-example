@@ -3,7 +3,6 @@ package com.tinvio.accounting.exception;
 import com.tinvio.accounting.model.enums.ResultCode;
 import com.tinvio.accounting.model.exception.ValidationErrorException;
 import com.tinvio.accounting.model.response.BaseResponse;
-import com.tinvio.accounting.model.response.ErrorResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;

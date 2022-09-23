@@ -3,7 +3,6 @@ package com.tinvio.accounting.repository;
 import com.tinvio.accounting.model.entity.FinanceBusinessAccount;
 import com.tinvio.accounting.repository.template.SqlBusinessAccountTemplate;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;

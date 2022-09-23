@@ -8,7 +8,6 @@ import com.tinvio.accounting.model.response.account.CreateBusinessAccountRespons
 import com.tinvio.accounting.service.AccountsService;
 import com.tinvio.collect.auth.Authorization;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
